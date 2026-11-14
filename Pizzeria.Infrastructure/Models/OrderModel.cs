@@ -27,19 +27,4 @@ namespace Pizzeria.Infrastructure.Models
         public DateTime? DepartureDate { get; set; }
         public DateTime? DeliveredDate { get; set; }
     }
-
-    public class OrderAddModel
-    {
-        public int CustomerId { get; set; }
-        public OrderType Type { get; set; } = OrderType.DineIn;
-        public string? DeliveryAddress { get; set; }
-        public string? Notes { get; set; }
-        public List<OrderDetailAddModel> Details { get; set; } = new();
-    }
-
-    public class ChangeStatusModel
-    {
-        public OrderStatus Status { get; set; }
-        public string? Courier { get; set; }
-    }
 }

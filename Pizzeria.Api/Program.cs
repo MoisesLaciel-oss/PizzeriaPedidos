@@ -1,5 +1,7 @@
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
+using Pizzeria.Application.Contract;
+using Pizzeria.Application.Service;
 using Pizzeria.Infrastructure.Context;
 using Pizzeria.Infrastructure.Interfaces;
 using Pizzeria.Infrastructure.Repositories;
@@ -13,6 +15,11 @@ builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IOrderDetailRepository, OrderDetailRepository>();
+
+builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<ICustomerService, CustomerService>();
+builder.Services.AddScoped<IOrderService, OrderService>();
+builder.Services.AddScoped<IOrderDetailService, OrderDetailService>();
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>

@@ -12,11 +12,4 @@ namespace Pizzeria.Infrastructure.Models
         public decimal UnitPrice { get; set; }
         public decimal Amount { get; set; }
     }
-
-    public class OrderDetailAddModel
-    {
-        public int ProductId { get; set; }
-        public int SizeId { get; set; }
-        public int Quantity { get; set; }
-    }
 }

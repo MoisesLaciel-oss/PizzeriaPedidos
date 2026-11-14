@@ -1,8 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Pizzeria.Domain.Entities;
-using Pizzeria.Infrastructure.Exceptions;
-using Pizzeria.Infrastructure.Interfaces;
-using Pizzeria.Infrastructure.Models;
+using Pizzeria.Application.Contract;
+using Pizzeria.Application.Dtos.Customers;
 
 namespace Pizzeria.Api.Controllers
 {
@@ -10,98 +8,58 @@ namespace Pizzeria.Api.Controllers
     [ApiController]
     public class CustomersController : ControllerBase
     {
-        private readonly ICustomerRepository _customerRepository;
-        private readonly IOrderRepository _orderRepository;
+        private readonly ICustomerService _customerService;
+        private readonly IOrderService _orderService;
 
-        public CustomersController(ICustomerRepository customerRepository, IOrderRepository orderRepository)
+        public CustomersController(ICustomerService customerService, IOrderService orderService)
         {
-            _customerRepository = customerRepository;
-            _orderRepository = orderRepository;
+            _customerService = customerService;
+            _orderService = orderService;
         }
 
         [HttpGet]
         public async Task<IActionResult> Get()
         {
-            return Ok(await _customerRepository.GetCustomersAsync());
+            return Ok(await _customerService.GetAllAsync());
         }
 
         [HttpGet("{id:int}")]
         public async Task<IActionResult> Get(int id)
         {
-            var customer = await _customerRepository.GetCustomerAsync(id);
-            return customer is null ? NotFound() : Ok(customer);
+            var result = await _customerService.GetByIdAsync(id);
+            return result.Success ? Ok(result) : NotFound(result);
         }
 
         [HttpGet("{id:int}/orders")]
         public async Task<IActionResult> GetOrders(int id)
         {
-            if (await _customerRepository.GetCustomerAsync(id) is null) return NotFound();
-            return Ok(await _orderRepository.GetOrdersByCustomerAsync(id));
+            var customer = await _customerService.GetByIdAsync(id);
+            if (!customer.Success) return NotFound(customer);
+
+            return Ok(await _orderService.GetByCustomerAsync(id));
         }
 
         [HttpPost]
-        public async Task<IActionResult> Post([FromBody] CustomerAddModel model)
+        public async Task<IActionResult> Post([FromBody] CustomerDtoAdd dto)
         {
-            try
-            {
-                var customer = new Customer();
-                Assign(customer, model);
-
-                await _customerRepository.SaveAsync(customer);
-
-                var created = await _customerRepository.GetCustomerAsync(customer.Id);
-                return CreatedAtAction(nameof(Get), new { id = customer.Id }, created);
-            }
-            catch (CustomerException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var result = await _customerService.SaveAsync(dto);
+            return result.Success ? Ok(result) : BadRequest(result);
         }
 
         [HttpPut("{id:int}")]
-        public async Task<IActionResult> Put(int id, [FromBody] CustomerAddModel model)
+        public async Task<IActionResult> Put(int id, [FromBody] CustomerDtoUpdate dto)
         {
-            try
-            {
-                var customer = await _customerRepository.GetByIdAsync(id);
-                if (customer is null) return NotFound();
+            dto.Id = id;
 
-                Assign(customer, model);
-
-                await _customerRepository.UpdateAsync(customer);
-                return Ok(await _customerRepository.GetCustomerAsync(id));
-            }
-            catch (CustomerException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var result = await _customerService.UpdateAsync(dto);
+            return result.Success ? Ok(result) : BadRequest(result);
         }
 
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {
-            try
-            {
-                var customer = await _customerRepository.GetByIdAsync(id);
-                if (customer is null) return NotFound();
-
-                await _customerRepository.RemoveAsync(customer);
-                return NoContent();
-            }
-            catch (CustomerException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-        }
-
-        private static void Assign(Customer customer, CustomerAddModel model)
-        {
-            customer.FirstName = model.FirstName;
-            customer.LastName = model.LastName;
-            customer.Phone = model.Phone;
-            customer.Email = model.Email;
-            customer.Address = model.Address;
-            customer.AddressReference = model.AddressReference;
+            var result = await _customerService.RemoveAsync(id);
+            return result.Success ? Ok(result) : BadRequest(result);
         }
     }
 }

@@ -1,8 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Pizzeria.Domain.Entities;
-using Pizzeria.Infrastructure.Exceptions;
-using Pizzeria.Infrastructure.Interfaces;
-using Pizzeria.Infrastructure.Models;
+using Pizzeria.Application.Contract;
+using Pizzeria.Application.Dtos.Products;
 
 namespace Pizzeria.Api.Controllers
 {
@@ -10,101 +8,54 @@ namespace Pizzeria.Api.Controllers
     [ApiController]
     public class ProductsController : ControllerBase
     {
-        private readonly IProductRepository _productRepository;
+        private readonly IProductService _productService;
 
-        public ProductsController(IProductRepository productRepository)
+        public ProductsController(IProductService productService)
         {
-            _productRepository = productRepository;
+            _productService = productService;
         }
 
         [HttpGet]
         public async Task<IActionResult> Get()
         {
-            return Ok(await _productRepository.GetProductsAsync());
+            return Ok(await _productService.GetAllAsync());
         }
 
         [HttpGet("{id:int}")]
         public async Task<IActionResult> Get(int id)
         {
-            var product = await _productRepository.GetProductAsync(id);
-            return product is null ? NotFound() : Ok(product);
+            var result = await _productService.GetByIdAsync(id);
+            return result.Success ? Ok(result) : NotFound(result);
         }
 
         [HttpPost]
-        public async Task<IActionResult> Post([FromBody] ProductAddModel model)
+        public async Task<IActionResult> Post([FromBody] ProductDtoAdd dto)
         {
-            try
-            {
-                var product = new Product
-                {
-                    Name = model.Name,
-                    Description = model.Description,
-                    Category = model.Category,
-                    IsActive = true,
-                    Prices = model.Prices
-                        .Select(p => new ProductPrice { SizeId = p.SizeId, Price = p.Price })
-                        .ToList(),
-                    Ingredients = model.IngredientIds
-                        .Distinct()
-                        .Select(id => new ProductIngredient { IngredientId = id })
-                        .ToList()
-                };
-
-                await _productRepository.SaveAsync(product);
-
-                var created = await _productRepository.GetProductAsync(product.Id);
-                return CreatedAtAction(nameof(Get), new { id = product.Id }, created);
-            }
-            catch (ProductException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var result = await _productService.SaveAsync(dto);
+            return result.Success ? Ok(result) : BadRequest(result);
         }
 
         [HttpPut("{id:int}")]
-        public async Task<IActionResult> Put(int id, [FromBody] ProductUpdateModel model)
+        public async Task<IActionResult> Put(int id, [FromBody] ProductDtoUpdate dto)
         {
-            try
-            {
-                var product = await _productRepository.GetByIdAsync(id);
-                if (product is null) return NotFound();
+            dto.Id = id;
 
-                product.Name = model.Name;
-                product.Description = model.Description;
-                product.Category = model.Category;
-                product.IsActive = model.IsActive;
-
-                await _productRepository.UpdateAsync(product);
-                return Ok(await _productRepository.GetProductAsync(id));
-            }
-            catch (ProductException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var result = await _productService.UpdateAsync(dto);
+            return result.Success ? Ok(result) : BadRequest(result);
         }
 
         [HttpPut("{id:int}/prices")]
-        public async Task<IActionResult> PutPrice(int id, [FromBody] PriceAddModel model)
+        public async Task<IActionResult> PutPrice(int id, [FromBody] PriceDto dto)
         {
-            try
-            {
-                await _productRepository.SetPriceAsync(id, model.SizeId, model.Price);
-                return Ok(await _productRepository.GetProductAsync(id));
-            }
-            catch (ProductException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var result = await _productService.SetPriceAsync(id, dto);
+            return result.Success ? Ok(result) : BadRequest(result);
         }
 
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var product = await _productRepository.GetByIdAsync(id);
-            if (product is null) return NotFound();
-
-            await _productRepository.RemoveAsync(product);
-            return NoContent();
+            var result = await _productService.RemoveAsync(id);
+            return result.Success ? Ok(result) : BadRequest(result);
         }
     }
 }

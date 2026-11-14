@@ -1,9 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using Pizzeria.Domain.Core;
-using Pizzeria.Domain.Entities;
-using Pizzeria.Infrastructure.Exceptions;
-using Pizzeria.Infrastructure.Interfaces;
-using Pizzeria.Infrastructure.Models;
+using Pizzeria.Application.Contract;
+using Pizzeria.Application.Dtos.OrderDetails;
+using Pizzeria.Application.Dtos.Orders;
 
 namespace Pizzeria.Api.Controllers
 {
@@ -11,128 +9,74 @@ namespace Pizzeria.Api.Controllers
     [ApiController]
     public class OrdersController : ControllerBase
     {
-        private readonly IOrderRepository _orderRepository;
-        private readonly IOrderDetailRepository _detailRepository;
+        private readonly IOrderService _orderService;
+        private readonly IOrderDetailService _detailService;
 
-        public OrdersController(IOrderRepository orderRepository, IOrderDetailRepository detailRepository)
+        public OrdersController(IOrderService orderService, IOrderDetailService detailService)
         {
-            _orderRepository = orderRepository;
-            _detailRepository = detailRepository;
+            _orderService = orderService;
+            _detailService = detailService;
         }
 
         [HttpGet]
         public async Task<IActionResult> Get()
         {
-            return Ok(await _orderRepository.GetOrdersAsync());
+            return Ok(await _orderService.GetAllAsync());
         }
 
         [HttpGet("{id:int}")]
         public async Task<IActionResult> Get(int id)
         {
-            var order = await _orderRepository.GetOrderAsync(id);
-            return order is null ? NotFound() : Ok(order);
+            var result = await _orderService.GetByIdAsync(id);
+            return result.Success ? Ok(result) : NotFound(result);
         }
 
         [HttpPost]
-        public async Task<IActionResult> Post([FromBody] OrderAddModel model)
+        public async Task<IActionResult> Post([FromBody] OrderDtoAdd dto)
         {
-            try
-            {
-                var order = new Order
-                {
-                    CustomerId = model.CustomerId,
-                    Type = model.Type,
-                    Notes = model.Notes,
-                    Details = model.Details
-                        .Select(d => new OrderDetail
-                        {
-                            ProductId = d.ProductId,
-                            SizeId = d.SizeId,
-                            Quantity = d.Quantity
-                        })
-                        .ToList(),
-                    Delivery = model.Type == OrderType.Delivery
-                        ? new Delivery { Address = model.DeliveryAddress?.Trim() ?? string.Empty }
-                        : null
-                };
-
-                await _orderRepository.SaveAsync(order);
-
-                var created = await _orderRepository.GetOrderAsync(order.Id);
-                return CreatedAtAction(nameof(Get), new { id = order.Id }, created);
-            }
-            catch (OrderException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var result = await _orderService.SaveAsync(dto);
+            return result.Success ? Ok(result) : BadRequest(result);
         }
 
         [HttpPatch("{id:int}/status")]
-        public async Task<IActionResult> PatchStatus(int id, [FromBody] ChangeStatusModel model)
+        public async Task<IActionResult> PatchStatus(int id, [FromBody] OrderDtoUpdate dto)
         {
-            try
-            {
-                if (await _orderRepository.GetOrderAsync(id) is null) return NotFound();
+            dto.Id = id;
 
-                await _orderRepository.ChangeStatusAsync(id, model.Status, model.Courier);
-                return Ok(await _orderRepository.GetOrderAsync(id));
-            }
-            catch (OrderException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var result = await _orderService.UpdateAsync(dto);
+            return result.Success ? Ok(result) : BadRequest(result);
         }
 
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var order = await _orderRepository.GetByIdAsync(id);
-            if (order is null) return NotFound();
-
-            await _orderRepository.RemoveAsync(order);
-            return NoContent();
+            var result = await _orderService.RemoveAsync(id);
+            return result.Success ? Ok(result) : BadRequest(result);
         }
 
         [HttpGet("{id:int}/details")]
         public async Task<IActionResult> GetDetails(int id)
         {
-            if (await _orderRepository.GetOrderAsync(id) is null) return NotFound();
-            return Ok(await _detailRepository.GetDetailsByOrderAsync(id));
+            var order = await _orderService.GetByIdAsync(id);
+            if (!order.Success) return NotFound(order);
+
+            return Ok(await _detailService.GetByOrderAsync(id));
         }
 
         [HttpPost("{id:int}/details")]
-        public async Task<IActionResult> PostDetail(int id, [FromBody] OrderDetailAddModel model)
+        public async Task<IActionResult> PostDetail(int id, [FromBody] OrderDetailDtoAdd dto)
         {
-            try
-            {
-                await _detailRepository.SaveAsync(new OrderDetail
-                {
-                    OrderId = id,
-                    ProductId = model.ProductId,
-                    SizeId = model.SizeId,
-                    Quantity = model.Quantity
-                });
+            dto.OrderId = id;
 
-                return Ok(await _orderRepository.GetOrderAsync(id));
-            }
-            catch (OrderException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var result = await _detailService.SaveAsync(dto);
+            return result.Success ? Ok(result) : BadRequest(result);
         }
 
         [HttpDelete("{id:int}/details/{detailId:int}")]
         public async Task<IActionResult> DeleteDetail(int id, int detailId)
         {
-            try
-            {
-                await _detailRepository.RemoveAsync(new OrderDetail { Id = detailId, OrderId = id });
-                return Ok(await _orderRepository.GetOrderAsync(id));
-            }
-            catch (OrderException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var result = await _detailService.RemoveAsync(id, detailId);
+            return result.Success ? Ok(result) : BadRequest(result);
         }
     }
 }

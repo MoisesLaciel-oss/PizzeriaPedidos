@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Pizzeria.Application\Pizzeria.Application.csproj" />
     <ProjectReference Include="..\Pizzeria.Infrastructure\Pizzeria.Infrastructure.csproj" />
   </ItemGroup>
 
